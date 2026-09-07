@@ -1,0 +1,1183 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>AquaGlow - Water Reminder</title>
+  <meta name="theme-color" content="#38bdf8" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="AquaGlow" />
+
+  <!-- Dynamic Web App Manifest Injection for PWA / APK generation -->
+  <link rel="manifest" id="pwa-manifest" />
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+          colors: {
+            sky: {
+              450: '#1ea4ed',
+              550: '#0284c7'
+            }
+          },
+          boxShadow: {
+            'glow-sky': '0 10px 25px -5px rgba(56, 189, 248, 0.4), 0 8px 10px -6px rgba(56, 189, 248, 0.2)',
+            'bubble': 'inset 2px 2px 5px rgba(255, 255, 255, 0.6), inset -2px -2px 5px rgba(14, 165, 233, 0.2), 0 4px 10px rgba(0, 0, 0, 0.05)',
+            'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* Gradient: Sky blue fading to pure white at bottom */
+    .sky-fade-bg {
+      background: linear-gradient(180deg, #38bdf8 0%, #7dd3fc 28%, #bae6fd 58%, #e0f2fe 82%, #ffffff 100%);
+      min-height: 100vh;
+      min-height: 100dvh;
+    }
+
+    /* Floating subtle bubble particles */
+    .bubble {
+      position: absolute;
+      background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.2));
+      border-radius: 50%;
+      pointer-events: none;
+      animation: floatUp 12s infinite ease-in-out;
+    }
+
+    @keyframes floatUp {
+      0% {
+        transform: translateY(110vh) scale(0.6);
+        opacity: 0;
+      }
+      20% {
+        opacity: 0.6;
+      }
+      80% {
+        opacity: 0.8;
+      }
+      100% {
+        transform: translateY(-20vh) scale(1.1);
+        opacity: 0;
+      }
+    }
+
+    /* Wave filling animation */
+    @keyframes waveFlow {
+      0% { transform: translateX(0); }
+      50% { transform: translateX(-25%); }
+      100% { transform: translateX(0); }
+    }
+
+    .animated-wave {
+      animation: waveFlow 6s ease-in-out infinite;
+    }
+
+    /* Hide scrollbar for tabs */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* Glass card effect */
+    .glass-card {
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+    }
+    
+    .glass-card-deep {
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.95);
+    }
+
+    /* Pulse animation for active timer */
+    @keyframes ringPulse {
+      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(14,165,233,0)); }
+      50% { transform: scale(1.02); filter: drop-shadow(0 0 14px rgba(14,165,233,0.35)); }
+    }
+    .active-pulse {
+      animation: ringPulse 2.8s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="sky-fade-bg font-sans text-slate-800 antialiased overflow-x-hidden flex justify-center selection:bg-sky-200">
+
+  <div id="bubbles-container" class="fixed inset-0 pointer-events-none overflow-hidden z-0" aria-hidden="true"></div>
+
+  <!-- Mobile App Frame Container -->
+  <div class="w-full max-w-md min-h-screen flex flex-col relative z-10 px-4 pt-5 pb-24 sm:px-6">
+    
+    <header class="flex items-center justify-between mb-4">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-10 h-10 rounded-2xl bg-white/80 shadow-bubble flex items-center justify-center text-sky-500 border border-white">
+          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-1.5">
+            AquaGlow
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/75 text-sky-700 uppercase tracking-wider border border-white/60 shadow-xs">Hydrate</span>
+          </h1>
+          <p id="current-date-txt" class="text-xs font-medium text-sky-950/70">Stay fresh & glowing</p>
+        </div>
+      </div>
+
+      <!-- Quick action buttons -->
+      <div class="flex items-center space-x-1.5">
+        <button id="install-app-btn" class="hidden h-9 px-3 rounded-xl bg-white/90 text-sky-700 hover:bg-white text-xs font-bold items-center gap-1.5 transition-all shadow-xs border border-white" title="Install as Android / Mobile App">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          <span>Install</span>
+        </button>
+
+        <button id="sound-toggle-btn" class="w-9 h-9 rounded-xl glass-card flex items-center justify-center text-sky-800 hover:bg-white transition-all shadow-xs" title="Toggle Sound">
+          <svg id="sound-icon-on" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+          </svg>
+          <svg id="sound-icon-off" class="w-4 h-4 hidden text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+          </svg>
+        </button>
+
+        <button id="info-btn" class="w-9 h-9 rounded-xl glass-card flex items-center justify-center text-sky-800 hover:bg-white transition-all shadow-xs" title="Hydration Tips & Goal">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <section class="glass-card rounded-3xl p-4 mb-4 shadow-glass transition-all">
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-sky-800">Daily Intake Goal</span>
+          <span id="streak-badge" class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-100/90 text-sky-700">🔥 3-day streak</span>
+        </div>
+        <button id="edit-goal-trigger" class="text-xs font-semibold text-sky-600 hover:text-sky-800 underline decoration-sky-300">Set Goal</button>
+      </div>
+
+      <div class="flex items-baseline justify-between mb-2">
+        <div>
+          <span id="current-intake-val" class="text-3xl font-extrabold text-slate-800">1250</span>
+          <span class="text-slate-500 font-medium text-sm"> / <span id="target-intake-val">2500</span> ml</span>
+        </div>
+        <div class="text-right">
+          <span id="percentage-val" class="text-lg font-bold text-sky-600">50%</span>
+        </div>
+      </div>
+
+      <!-- Fluid Bar -->
+      <div class="w-full bg-white/80 rounded-full h-3.5 p-0.5 overflow-hidden shadow-inner border border-white">
+        <div id="intake-progress-bar" class="h-full rounded-full bg-gradient-to-r from-sky-400 via-sky-500 to-cyan-400 transition-all duration-700 ease-out" style="width: 50%;"></div>
+      </div>
+
+      <div class="flex items-center justify-between mt-2.5 text-[11px] font-medium text-sky-900/70">
+        <span id="remaining-text">💧 1250 ml remaining to goal</span>
+        <span id="cups-count-text">5 / 10 glasses</span>
+      </div>
+    </section>
+
+    <section class="glass-card-deep rounded-3xl p-5 mb-4 shadow-glass border border-white/90 relative overflow-hidden active-pulse" id="timer-card">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500">Reminder Countdown</h2>
+        </div>
+        <div id="timer-status-badge" class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-700">
+          Ready
+        </div>
+      </div>
+
+      <!-- Circular / Gauge visual timer -->
+      <div class="relative flex flex-col items-center justify-center my-3">
+        <div class="relative w-56 h-56 flex items-center justify-center">
+          <!-- Circular Progress SVG -->
+          <svg class="w-full h-full -rotate-90 transform" viewBox="0 0 120 120">
+            <circle cx="60" cy="60" r="50" class="text-sky-100/90" stroke-width="7" stroke="currentColor" fill="none" />
+            <circle id="timer-progress-ring" cx="60" cy="60" r="50" class="text-sky-500 transition-all duration-300" stroke-width="8" stroke="currentColor" stroke-dasharray="314.159" stroke-dashoffset="0" stroke-linecap="round" fill="none" />
+          </svg>
+
+          <!-- Inside content -->
+          <div class="absolute inset-0 flex flex-col items-center justify-center text-center select-none">
+            <div class="w-10 h-10 mb-1 rounded-full bg-sky-50 text-sky-500 flex items-center justify-center shadow-xs">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <span id="countdown-display" class="text-4xl font-black tracking-tight text-slate-800 font-mono">30:00</span>
+            <span id="next-alert-text" class="text-[11px] font-medium text-slate-400 mt-1">Next drink reminder</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timer Control Actions -->
+      <div class="flex items-center justify-center gap-3 mt-1">
+        <button id="reset-timer-btn" class="h-11 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 shadow-xs">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Reset
+        </button>
+
+        <button id="toggle-timer-btn" class="h-12 px-7 rounded-2xl bg-gradient-to-r from-sky-500 to-cyan-500 hover:from-sky-600 hover:to-cyan-600 text-white font-extrabold text-sm flex items-center gap-2 transition-all shadow-glow-sky active:scale-95">
+          <svg id="play-icon" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+          <svg id="pause-icon" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+          </svg>
+          <span id="toggle-btn-text">Start Timer</span>
+        </button>
+
+        <button id="repeat-mode-btn" class="h-11 px-3.5 rounded-2xl bg-sky-50 hover:bg-sky-100 text-sky-700 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 border border-sky-100" title="Auto-repeat timer when it rings">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+          </svg>
+          <span id="repeat-label">Repeat: ON</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="glass-card rounded-3xl p-4 mb-4 shadow-glass">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700">Set Timer Whenever You Want</h3>
+        <button id="custom-time-btn" class="text-xs font-semibold text-sky-600 hover:text-sky-800 flex items-center gap-1">
+          <span>Custom...</span>
+        </button>
+      </div>
+
+      <!-- Quick Preset Intervals -->
+      <div class="grid grid-cols-4 gap-2 mb-2">
+        <button data-minutes="15" class="timer-preset-btn py-2.5 rounded-xl font-bold text-xs transition bg-white/70 hover:bg-white text-slate-700 border border-white shadow-xs">
+          15m
+        </button>
+        <button data-minutes="30" class="timer-preset-btn active py-2.5 rounded-xl font-bold text-xs transition bg-sky-500 text-white shadow-glow-sky border border-sky-400">
+          30m
+        </button>
+        <button data-minutes="45" class="timer-preset-btn py-2.5 rounded-xl font-bold text-xs transition bg-white/70 hover:bg-white text-slate-700 border border-white shadow-xs">
+          45m
+        </button>
+        <button data-minutes="60" class="timer-preset-btn py-2.5 rounded-xl font-bold text-xs transition bg-white/70 hover:bg-white text-slate-700 border border-white shadow-xs">
+          1 hr
+        </button>
+      </div>
+
+      <div class="grid grid-cols-3 gap-2">
+        <button data-minutes="90" class="timer-preset-btn py-2 rounded-xl font-medium text-xs transition bg-white/70 hover:bg-white text-slate-700 border border-white shadow-xs">
+          1 hr 30m
+        </button>
+        <button data-minutes="120" class="timer-preset-btn py-2 rounded-xl font-medium text-xs transition bg-white/70 hover:bg-white text-slate-700 border border-white shadow-xs">
+          2 hrs
+        </button>
+        <button data-minutes="180" class="timer-preset-btn py-2 rounded-xl font-medium text-xs transition bg-white/70 hover:bg-white text-slate-700 border border-white shadow-xs">
+          3 hrs
+        </button>
+      </div>
+
+      <!-- Custom duration accordion/input -->
+      <div id="custom-picker-panel" class="hidden mt-3 pt-3 border-t border-sky-100 flex flex-col gap-2.5">
+        <div class="text-xs font-semibold text-slate-600">Pick any custom duration:</div>
+        <div class="flex items-center gap-2">
+          <div class="flex-1 flex items-center bg-white rounded-xl px-3 py-2 border border-sky-100 shadow-inner">
+            <input id="custom-minutes-input" type="number" min="1" max="720" value="25" class="w-full text-slate-800 font-bold outline-none text-sm bg-transparent" placeholder="Minutes" />
+            <span class="text-xs font-semibold text-slate-400">mins</span>
+          </div>
+          <button id="apply-custom-btn" class="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-xl text-xs font-bold transition shadow-xs">
+            Set & Run
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="glass-card-deep rounded-3xl p-4 mb-4 shadow-glass">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700">Quick Drink Log</h3>
+        <span class="text-[11px] text-slate-400 font-medium">Tap to log water</span>
+      </div>
+
+      <div class="grid grid-cols-4 gap-2">
+        <button data-amount="150" class="drink-add-btn group flex flex-col items-center justify-center p-2.5 rounded-2xl bg-white hover:bg-sky-50 border border-sky-100 transition shadow-xs active:scale-95">
+          <div class="w-8 h-8 rounded-full bg-sky-100/70 text-sky-600 flex items-center justify-center mb-1 group-hover:scale-110 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700">+150 ml</span>
+          <span class="text-[9px] text-slate-400">Small Cup</span>
+        </button>
+
+        <button data-amount="250" class="drink-add-btn group flex flex-col items-center justify-center p-2.5 rounded-2xl bg-white hover:bg-sky-50 border border-sky-100 transition shadow-xs active:scale-95">
+          <div class="w-8 h-8 rounded-full bg-sky-100/70 text-sky-600 flex items-center justify-center mb-1 group-hover:scale-110 transition">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+            </svg>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700">+250 ml</span>
+          <span class="text-[9px] text-slate-400">Glass</span>
+        </button>
+
+        <button data-amount="500" class="drink-add-btn group flex flex-col items-center justify-center p-2.5 rounded-2xl bg-white hover:bg-sky-50 border border-sky-100 transition shadow-xs active:scale-95">
+          <div class="w-8 h-8 rounded-full bg-sky-100/70 text-sky-600 flex items-center justify-center mb-1 group-hover:scale-110 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700">+500 ml</span>
+          <span class="text-[9px] text-slate-400">Bottle</span>
+        </button>
+
+        <button id="custom-drink-btn" class="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-sky-50 hover:bg-sky-100/80 border border-sky-200 transition shadow-xs active:scale-95">
+          <div class="w-8 h-8 rounded-full bg-white text-sky-600 flex items-center justify-center mb-1 shadow-xs">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+          </div>
+          <span class="text-[11px] font-bold text-sky-700">Custom</span>
+          <span class="text-[9px] text-sky-600/80">Other ml</span>
+        </button>
+      </div>
+
+      <!-- Quick Custom Drink Input -->
+      <div id="custom-drink-input-row" class="hidden mt-3 pt-3 border-t border-sky-100 flex items-center gap-2">
+        <input id="custom-drink-amount" type="number" min="10" max="2000" placeholder="e.g. 330" class="flex-1 bg-white border border-sky-100 rounded-xl px-3 py-2 text-sm font-semibold outline-none shadow-inner" />
+        <button id="submit-custom-drink-btn" class="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-xl text-xs font-bold shadow-xs">Add</button>
+      </div>
+    </section>
+
+    <section class="glass-card rounded-3xl p-4 shadow-glass mb-2">
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-1.5">
+          <svg class="w-4 h-4 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700">Today's History</h3>
+        </div>
+        <button id="clear-history-btn" class="text-[11px] text-slate-400 hover:text-red-500 font-medium transition">Clear</button>
+      </div>
+
+      <div id="history-empty" class="py-4 text-center text-xs text-slate-400">
+        No water logged yet today. Take your first sip!
+      </div>
+
+      <div id="history-list" class="space-y-2 max-h-36 overflow-y-auto no-scrollbar hidden">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <div class="mt-3 pt-3 border-t border-sky-100 flex items-center gap-2 text-sky-900/80 bg-white/50 p-2.5 rounded-2xl">
+        <span class="text-lg">💡</span>
+        <p class="text-[11px] leading-snug font-medium text-slate-600" id="hydration-tip">
+          Drinking a glass of water right after waking up fires up your metabolism and clears toxins!
+        </p>
+      </div>
+    </section>
+
+    <!-- Floating bottom indicator / safe area spacing -->
+    <footer class="text-center mt-3 text-[11px] text-slate-400 font-medium">
+      AquaGlow Reminder • Tap any preset anytime to hydrate
+    </footer>
+  </div>
+
+  <!-- Drink Reminder Alert Dialog Modal -->
+  <div id="reminder-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300">
+    <div class="bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl transform scale-95 transition-all duration-300 border border-sky-100" id="reminder-modal-box">
+      <div class="w-20 h-20 mx-auto mb-4 rounded-3xl bg-sky-100 text-sky-500 flex items-center justify-center shadow-bubble active-pulse">
+        <svg class="w-12 h-12" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+        </svg>
+      </div>
+      <h3 class="text-xl font-extrabold text-slate-900">Time to Drink Water! 💧</h3>
+      <p class="text-xs text-slate-500 mt-1 mb-5">Your body thrives on regular hydration. Grab your glass and take a refreshing drink right now.</p>
+      
+      <div class="grid grid-cols-2 gap-2 mb-3">
+        <button id="modal-drink-250-btn" class="py-2.5 px-3 bg-sky-500 hover:bg-sky-600 text-white font-bold rounded-2xl text-xs transition shadow-glow-sky">
+          Drank 250 ml!
+        </button>
+        <button id="modal-drink-500-btn" class="py-2.5 px-3 bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-2xl text-xs transition">
+          Drank 500 ml!
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="modal-snooze-btn" class="flex-1 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-2xl text-xs transition">
+          Snooze 5 min
+        </button>
+        <button id="modal-dismiss-btn" class="flex-1 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-2xl text-xs transition">
+          Dismiss
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings / Goal Modal -->
+  <div id="goal-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300">
+    <div class="bg-white rounded-3xl p-6 max-w-xs w-full shadow-2xl border border-sky-100" id="goal-modal-box">
+      <h3 class="text-base font-bold text-slate-900 mb-1">Set Daily Water Goal</h3>
+      <p class="text-xs text-slate-500 mb-4">Recommended daily intake is roughly 2,000ml to 3,000ml depending on your activity level.</p>
+      
+      <label class="block text-xs font-semibold text-slate-700 mb-1">Target Volume (ml)</label>
+      <div class="flex items-center bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 mb-4">
+        <input id="input-goal-value" type="number" step="50" min="500" max="6000" class="w-full bg-transparent font-bold text-slate-800 outline-none text-sm" value="2500" />
+        <span class="text-xs font-bold text-slate-400">ml</span>
+      </div>
+
+      <div class="flex gap-2">
+        <button id="cancel-goal-btn" class="flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200 transition">Cancel</button>
+        <button id="save-goal-btn" class="flex-1 py-2 rounded-xl bg-sky-500 text-white text-xs font-bold hover:bg-sky-600 transition shadow-xs">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom In-App Notification Banner -->
+  <div id="toast" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-slate-900/90 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-lg pointer-events-none opacity-0 transition-opacity duration-300 z-50 flex items-center gap-2">
+    <span id="toast-icon">💧</span>
+    <span id="toast-msg">Water intake logged!</span>
+  </div>
+
+  <script>
+    // 1. Dynamic Web App Manifest creation (so it installs as standalone app on any device)
+    (function injectManifest() {
+      const manifestData = {
+        name: "AquaGlow Hydration Reminder",
+        short_name: "AquaGlow",
+        description: "Stay fresh, hydrated and glowing with custom reminders",
+        start_url: "./",
+        display: "standalone",
+        orientation: "portrait",
+        background_color: "#bae6fd",
+        theme_color: "#38bdf8",
+        icons: [
+          {
+            src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='48' fill='%230284c7'/><path d='M50 15 L72 45 A25 25 0 1 1 28 45 Z' fill='white'/></svg>",
+            sizes: "192x192 512x512",
+            type: "image/svg+xml",
+            purpose: "any maskable"
+          }
+        ]
+      };
+      const stringManifest = JSON.stringify(manifestData);
+      const blob = new Blob([stringManifest], { type: 'application/json' });
+      const manifestURL = URL.createObjectURL(blob);
+      const manifestLink = document.getElementById('pwa-manifest');
+      if (manifestLink) {
+        manifestLink.setAttribute('href', manifestURL);
+      }
+    })();
+
+    // 2. Register inline Service Worker for full offline performance
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        const swCode = `
+          const CACHE_NAME = 'aquaglow-v2';
+          self.addEventListener('install', (e) => {
+            self.skipWaiting();
+          });
+          self.addEventListener('activate', (e) => {
+            e.waitUntil(clients.claim());
+          });
+          self.addEventListener('fetch', (e) => {
+            e.respondWith(
+              fetch(e.request).catch(() => caches.match(e.request))
+            );
+          });
+        `;
+        const blob = new Blob([swCode], { type: 'text/javascript' });
+        const swUrl = URL.createObjectURL(blob);
+        navigator.serviceWorker.register(swUrl).catch(() => {
+          // Fallback if Blob URL registration is restricted
+        });
+      });
+    }
+
+    // State Object with LocalStorage fallback & background accuracy
+    const STATE = {
+      intake: 1250,
+      goal: 2500,
+      streak: 3,
+      history: [
+        { id: 1, amount: 250, time: '08:30 AM' },
+        { id: 2, amount: 500, time: '10:45 AM' },
+        { id: 3, amount: 250, time: '01:15 PM' },
+        { id: 4, amount: 250, time: '03:40 PM' }
+      ],
+      timer: {
+        totalDurationSec: 30 * 60, // default 30 mins
+        remainingSec: 30 * 60,
+        isRunning: false,
+        intervalId: null,
+        targetTimestamp: null, // Absolute timestamp to keep running even when tab/phone sleeps!
+        repeatMode: true
+      },
+      soundEnabled: true,
+      wakeLock: null
+    };
+
+    // Load persisted state if exists
+    try {
+      const savedData = localStorage.getItem('aquaglow_data');
+      if (savedData) {
+        const parsed = JSON.parse(savedData);
+        if (parsed.intake !== undefined) STATE.intake = parsed.intake;
+        if (parsed.goal !== undefined) STATE.goal = parsed.goal;
+        if (parsed.streak !== undefined) STATE.streak = parsed.streak;
+        if (parsed.history !== undefined) STATE.history = parsed.history;
+        if (parsed.soundEnabled !== undefined) STATE.soundEnabled = parsed.soundEnabled;
+        if (parsed.timerMinutes !== undefined) {
+          STATE.timer.totalDurationSec = parsed.timerMinutes * 60;
+          STATE.timer.remainingSec = parsed.timerMinutes * 60;
+        }
+        if (parsed.targetTimestamp && parsed.isRunning) {
+          const now = Date.now();
+          if (parsed.targetTimestamp > now) {
+            STATE.timer.remainingSec = Math.round((parsed.targetTimestamp - now) / 1000);
+            STATE.timer.targetTimestamp = parsed.targetTimestamp;
+            STATE.timer.isRunning = true;
+          } else {
+            STATE.timer.remainingSec = 0;
+            STATE.timer.isRunning = false;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Storage not accessible', e);
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem('aquaglow_data', JSON.stringify({
+          intake: STATE.intake,
+          goal: STATE.goal,
+          streak: STATE.streak,
+          history: STATE.history,
+          soundEnabled: STATE.soundEnabled,
+          timerMinutes: Math.round(STATE.timer.totalDurationSec / 60),
+          targetTimestamp: STATE.timer.targetTimestamp,
+          isRunning: STATE.timer.isRunning
+        }));
+      } catch (e) {}
+    }
+
+    // Optional Screen Wake Lock to prevent phone screen from dimming while tracking
+    async function requestWakeLock() {
+      if ('wakeLock' in navigator) {
+        try {
+          STATE.wakeLock = await navigator.wakeLock.request('screen');
+        } catch (err) {}
+      }
+    }
+
+    function releaseWakeLock() {
+      if (STATE.wakeLock) {
+        STATE.wakeLock.release().catch(() => {});
+        STATE.wakeLock = null;
+      }
+    }
+
+    // Re-synchronize timer on page visibility change (when unlocking phone or switching apps)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && STATE.timer.isRunning && STATE.timer.targetTimestamp) {
+        const remaining = Math.round((STATE.timer.targetTimestamp - Date.now()) / 1000);
+        if (remaining <= 0) {
+          STATE.timer.remainingSec = 0;
+          updateTimerDisplay();
+          triggerReminderAlarm();
+        } else {
+          STATE.timer.remainingSec = remaining;
+          updateTimerDisplay();
+        }
+      }
+    });
+
+    // Web Audio API Synthesizer (No external MP3 files needed!)
+    let audioCtx = null;
+
+    function getAudioContext() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass();
+        }
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    // Gentle water drop splash sound
+    function playWaterDropSound() {
+      if (!STATE.soundEnabled) return;
+      try {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'sine';
+        // Pitch sweep upward then settle (characteristic water drop)
+        osc.frequency.setValueAtTime(600, now);
+        osc.frequency.exponentialRampToValueAtTime(1400, now + 0.08);
+        osc.frequency.exponentialRampToValueAtTime(800, now + 0.22);
+
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.25);
+      } catch (err) {
+        console.log('Audio playback error', err);
+      }
+    }
+
+    // Melodic chime for reminder alert
+    function playReminderChime() {
+      if (!STATE.soundEnabled) return;
+      try {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6 arpeggio
+        notes.forEach((freq, idx) => {
+          const startTime = ctx.currentTime + idx * 0.12;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, startTime);
+
+          gain.gain.setValueAtTime(0.25, startTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.6);
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+
+          osc.start(startTime);
+          osc.stop(startTime + 0.65);
+        });
+      } catch (err) {}
+    }
+
+    function initBubbles() {
+      const container = document.getElementById('bubbles-container');
+      const bubbleCount = 14;
+      for (let i = 0; i < bubbleCount; i++) {
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        const size = Math.random() * 30 + 10;
+        bubble.style.width = `${size}px`;
+        bubble.style.height = `${size}px`;
+        bubble.style.left = `${Math.random() * 100}%`;
+        bubble.style.animationDuration = `${Math.random() * 8 + 9}s`;
+        bubble.style.animationDelay = `${Math.random() * 8}s`;
+        container.appendChild(bubble);
+      }
+    }
+
+    function updateHeaderDate() {
+      const dateElem = document.getElementById('current-date-txt');
+      const options = { weekday: 'short', month: 'short', day: 'numeric' };
+      dateElem.textContent = new Date().toLocaleDateString('en-US', options) + ' • Keep hydrated';
+    }
+
+    const TIPS = [
+      "Drinking a glass of water right after waking up fires up your metabolism!",
+      "Mild dehydration can cause fatigue and headaches. Take a sip!",
+      "Water helps maintain normal body temperature and lubricates joints.",
+      "Carry a refillable water bottle to build a consistent hydration habit.",
+      "Drinking water before meals can aid digestion and appetite control."
+    ];
+
+    function rotateHydrationTip() {
+      const tipElem = document.getElementById('hydration-tip');
+      const randomTip = TIPS[Math.floor(Math.random() * TIPS.length)];
+      tipElem.textContent = randomTip;
+    }
+
+    function renderIntakeProgress() {
+      const currentIntake = document.getElementById('current-intake-val');
+      const targetIntake = document.getElementById('target-intake-val');
+      const percentageVal = document.getElementById('percentage-val');
+      const progressBar = document.getElementById('intake-progress-bar');
+      const remainingText = document.getElementById('remaining-text');
+      const cupsCountText = document.getElementById('cups-count-text');
+
+      const pct = Math.min(100, Math.round((STATE.intake / STATE.goal) * 100));
+      const remaining = Math.max(0, STATE.goal - STATE.intake);
+      const cupsTotal = Math.round(STATE.goal / 250);
+      const cupsDrank = Math.round(STATE.intake / 250);
+
+      currentIntake.textContent = STATE.intake;
+      targetIntake.textContent = STATE.goal;
+      percentageVal.textContent = `${pct}%`;
+      progressBar.style.width = `${pct}%`;
+
+      remainingText.textContent = remaining > 0 ? `💧 ${remaining} ml remaining to goal` : `🎉 Daily goal achieved!`;
+      cupsCountText.textContent = `${cupsDrank} / ${cupsTotal} glasses`;
+
+      renderHistory();
+      saveState();
+    }
+
+    function renderHistory() {
+      const listElem = document.getElementById('history-list');
+      const emptyElem = document.getElementById('history-empty');
+
+      if (!STATE.history || STATE.history.length === 0) {
+        listElem.classList.add('hidden');
+        emptyElem.classList.remove('hidden');
+        return;
+      }
+
+      listElem.classList.remove('hidden');
+      emptyElem.classList.add('hidden');
+      listElem.innerHTML = '';
+
+      // Most recent first
+      const reversed = [...STATE.history].reverse();
+      reversed.forEach((item) => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center justify-between py-1.5 px-3 bg-white/70 rounded-xl border border-white text-xs shadow-2xs';
+        div.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="text-sky-500 font-bold">💧 +${item.amount} ml</span>
+            <span class="text-slate-400 text-[10px]">${item.time}</span>
+          </div>
+          <button onclick="removeHistoryItem(${item.id})" class="text-slate-300 hover:text-red-500 transition p-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        `;
+        listElem.appendChild(div);
+      });
+    }
+
+    window.removeHistoryItem = function(id) {
+      const idx = STATE.history.findIndex(x => x.id === id);
+      if (idx !== -1) {
+        const removed = STATE.history.splice(idx, 1)[0];
+        STATE.intake = Math.max(0, STATE.intake - removed.amount);
+        renderIntakeProgress();
+        showToast(`Removed ${removed.amount} ml`);
+      }
+    };
+
+    function formatTime(totalSeconds) {
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = totalSeconds % 60;
+      return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function updateTimerDisplay() {
+      const countdownDisplay = document.getElementById('countdown-display');
+      const progressRing = document.getElementById('timer-progress-ring');
+      const statusBadge = document.getElementById('timer-status-badge');
+      const toggleBtnText = document.getElementById('toggle-btn-text');
+      const playIcon = document.getElementById('play-icon');
+      const pauseIcon = document.getElementById('pause-icon');
+
+      countdownDisplay.textContent = formatTime(STATE.timer.remainingSec);
+
+      // SVG Ring circumference: 2 * Math.PI * 50 = ~314.159
+      const circumference = 314.159;
+      const fraction = STATE.timer.remainingSec / (STATE.timer.totalDurationSec || 1);
+      const offset = circumference * (1 - fraction);
+      progressRing.style.strokeDashoffset = offset;
+
+      if (STATE.timer.isRunning) {
+        statusBadge.textContent = 'Active';
+        statusBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700';
+        toggleBtnText.textContent = 'Pause';
+        playIcon.classList.add('hidden');
+        pauseIcon.classList.remove('hidden');
+      } else {
+        statusBadge.textContent = STATE.timer.remainingSec === STATE.timer.totalDurationSec ? 'Ready' : 'Paused';
+        statusBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-700';
+        toggleBtnText.textContent = 'Start Timer';
+        playIcon.classList.remove('hidden');
+        pauseIcon.classList.add('hidden');
+      }
+    }
+
+    function startTimer() {
+      getAudioContext(); // Pre-warm audio on user gesture
+      if (STATE.timer.intervalId) clearInterval(STATE.timer.intervalId);
+
+      STATE.timer.isRunning = true;
+      // Calculate real wall-clock completion timestamp for seamless background tracking
+      STATE.timer.targetTimestamp = Date.now() + STATE.timer.remainingSec * 1000;
+      requestWakeLock();
+      updateTimerDisplay();
+      saveState();
+
+      STATE.timer.intervalId = setInterval(() => {
+        const remaining = Math.round((STATE.timer.targetTimestamp - Date.now()) / 1000);
+        if (remaining > 0) {
+          STATE.timer.remainingSec = remaining;
+          updateTimerDisplay();
+        } else {
+          STATE.timer.remainingSec = 0;
+          updateTimerDisplay();
+          triggerReminderAlarm();
+        }
+      }, 1000);
+    }
+
+    function pauseTimer() {
+      STATE.timer.isRunning = false;
+      STATE.timer.targetTimestamp = null;
+      releaseWakeLock();
+      if (STATE.timer.intervalId) {
+        clearInterval(STATE.timer.intervalId);
+        STATE.timer.intervalId = null;
+      }
+      updateTimerDisplay();
+      saveState();
+    }
+
+    function resetTimer(newSeconds = null) {
+      pauseTimer();
+      if (newSeconds !== null) {
+        STATE.timer.totalDurationSec = newSeconds;
+      }
+      STATE.timer.remainingSec = STATE.timer.totalDurationSec;
+      STATE.timer.targetTimestamp = null;
+      updateTimerDisplay();
+      saveState();
+    }
+
+    function triggerReminderAlarm() {
+      pauseTimer();
+      playReminderChime();
+
+      // Trigger device vibration if available
+      if (navigator.vibrate) {
+        try { navigator.vibrate([200, 100, 200, 100, 300]); } catch (e) {}
+      }
+
+      // Show reminder modal
+      openReminderModal();
+
+      // System notification if permission was previously granted
+      if ("Notification" in window && Notification.permission === "granted") {
+        try {
+          new Notification("Time to Drink Water! 💧", {
+            body: "Take a refreshing sip to stay energized and hydrated.",
+            icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230284c7'><path d='M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z'/></svg>"
+          });
+        } catch (e) {}
+      }
+    }
+
+    function showToast(message, icon = '💧') {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-msg').textContent = message;
+      document.getElementById('toast-icon').textContent = icon;
+      toast.classList.remove('opacity-0');
+      toast.classList.add('opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('opacity-100');
+        toast.classList.add('opacity-0');
+      }, 2400);
+    }
+
+    function openReminderModal() {
+      const modal = document.getElementById('reminder-modal');
+      const box = document.getElementById('reminder-modal-box');
+      modal.classList.remove('opacity-0', 'pointer-events-none');
+      box.classList.remove('scale-95');
+      box.classList.add('scale-100');
+    }
+
+    function closeReminderModal() {
+      const modal = document.getElementById('reminder-modal');
+      const box = document.getElementById('reminder-modal-box');
+      modal.classList.add('opacity-0', 'pointer-events-none');
+      box.classList.remove('scale-100');
+      box.classList.add('scale-95');
+
+      // If repeat mode is enabled, auto start next interval
+      if (STATE.timer.repeatMode) {
+        resetTimer();
+        startTimer();
+      }
+    }
+
+    function addWaterIntake(amount) {
+      STATE.intake += amount;
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      STATE.history.push({
+        id: Date.now(),
+        amount: amount,
+        time: timeStr
+      });
+
+      playWaterDropSound();
+      renderIntakeProgress();
+      showToast(`+${amount} ml added! Keep going!`, '🌊');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initBubbles();
+      updateHeaderDate();
+      renderIntakeProgress();
+
+      // Resume timer if active before reload
+      if (STATE.timer.isRunning && STATE.timer.targetTimestamp) {
+        startTimer();
+      } else {
+        updateTimerDisplay();
+      }
+
+      let deferredPrompt = null;
+      const installBtn = document.getElementById('install-app-btn');
+
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        if (installBtn) {
+          installBtn.classList.remove('hidden');
+          installBtn.classList.add('flex');
+        }
+      });
+
+      if (installBtn) {
+        installBtn.addEventListener('click', async () => {
+          if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+              showToast('AquaGlow installed to your phone!', '📱');
+            }
+            deferredPrompt = null;
+            installBtn.classList.add('hidden');
+            installBtn.classList.remove('flex');
+          } else {
+            showToast('Tap browser menu (⋮ or Share) -> Add to Home Screen', '💡');
+          }
+        });
+      }
+
+      // Sound toggle
+      const soundBtn = document.getElementById('sound-toggle-btn');
+      const soundOnIcon = document.getElementById('sound-icon-on');
+      const soundOffIcon = document.getElementById('sound-icon-off');
+
+      function syncSoundUI() {
+        if (STATE.soundEnabled) {
+          soundOnIcon.classList.remove('hidden');
+          soundOffIcon.classList.add('hidden');
+        } else {
+          soundOnIcon.classList.add('hidden');
+          soundOffIcon.classList.remove('hidden');
+        }
+      }
+      syncSoundUI();
+
+      soundBtn.addEventListener('click', () => {
+        STATE.soundEnabled = !STATE.soundEnabled;
+        syncSoundUI();
+        showToast(STATE.soundEnabled ? 'Alert sounds: ON' : 'Alert sounds: OFF', STATE.soundEnabled ? '🔊' : '🔇');
+        saveState();
+      });
+
+      // Play/Pause Timer Button
+      document.getElementById('toggle-timer-btn').addEventListener('click', () => {
+        if (STATE.timer.isRunning) {
+          pauseTimer();
+        } else {
+          startTimer();
+        }
+      });
+
+      // Reset Timer
+      document.getElementById('reset-timer-btn').addEventListener('click', () => {
+        resetTimer();
+        showToast('Timer reset');
+      });
+
+      // Repeat Mode Toggle
+      const repeatBtn = document.getElementById('repeat-mode-btn');
+      const repeatLabel = document.getElementById('repeat-label');
+      repeatBtn.addEventListener('click', () => {
+        STATE.timer.repeatMode = !STATE.timer.repeatMode;
+        repeatLabel.textContent = `Repeat: ${STATE.timer.repeatMode ? 'ON' : 'OFF'}`;
+        showToast(STATE.timer.repeatMode ? 'Auto-repeat enabled' : 'Auto-repeat disabled', '🔄');
+      });
+
+      // Preset Interval buttons
+      const presetButtons = document.querySelectorAll('.timer-preset-btn');
+      presetButtons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          presetButtons.forEach(b => {
+            b.classList.remove('active', 'bg-sky-500', 'text-white', 'shadow-glow-sky', 'border-sky-400');
+            b.classList.add('bg-white/70', 'text-slate-700', 'border-white');
+          });
+
+          btn.classList.add('active', 'bg-sky-500', 'text-white', 'shadow-glow-sky', 'border-sky-400');
+          btn.classList.remove('bg-white/70', 'text-slate-700', 'border-white');
+
+          const mins = parseInt(btn.getAttribute('data-minutes'), 10);
+          resetTimer(mins * 60);
+          startTimer();
+          showToast(`Timer set for ${mins} minutes & started!`, '⏱️');
+        });
+      });
+
+      // Custom Time Picker toggle
+      const customTimeBtn = document.getElementById('custom-time-btn');
+      const customPickerPanel = document.getElementById('custom-picker-panel');
+      customTimeBtn.addEventListener('click', () => {
+        customPickerPanel.classList.toggle('hidden');
+      });
+
+      document.getElementById('apply-custom-btn').addEventListener('click', () => {
+        const input = document.getElementById('custom-minutes-input');
+        const val = parseInt(input.value, 10);
+        if (val && val > 0 && val <= 720) {
+          presetButtons.forEach(b => {
+            b.classList.remove('active', 'bg-sky-500', 'text-white', 'shadow-glow-sky');
+            b.classList.add('bg-white/70', 'text-slate-700');
+          });
+          resetTimer(val * 60);
+          startTimer();
+          customPickerPanel.classList.add('hidden');
+          showToast(`Custom timer set for ${val} minutes`, '⏱️');
+        } else {
+          showToast('Please enter minutes between 1 and 720', '⚠️');
+        }
+      });
+
+      // Quick Drink Intake buttons
+      document.querySelectorAll('.drink-add-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const amt = parseInt(btn.getAttribute('data-amount'), 10);
+          addWaterIntake(amt);
+        });
+      });
+
+      // Custom drink input toggle
+      const customDrinkBtn = document.getElementById('custom-drink-btn');
+      const customDrinkRow = document.getElementById('custom-drink-input-row');
+      customDrinkBtn.addEventListener('click', () => {
+        customDrinkRow.classList.toggle('hidden');
+      });
+
+      document.getElementById('submit-custom-drink-btn').addEventListener('click', () => {
+        const input = document.getElementById('custom-drink-amount');
+        const amt = parseInt(input.value, 10);
+        if (amt && amt > 0) {
+          addWaterIntake(amt);
+          input.value = '';
+          customDrinkRow.classList.add('hidden');
+        }
+      });
+
+      // Clear history
+      document.getElementById('clear-history-btn').addEventListener('click', () => {
+        if (STATE.history.length === 0) return;
+        STATE.history = [];
+        STATE.intake = 0;
+        renderIntakeProgress();
+        showToast('Daily log reset');
+      });
+
+      // Modal buttons
+      document.getElementById('modal-drink-250-btn').addEventListener('click', () => {
+        addWaterIntake(250);
+        closeReminderModal();
+      });
+
+      document.getElementById('modal-drink-500-btn').addEventListener('click', () => {
+        addWaterIntake(500);
+        closeReminderModal();
+      });
+
+      document.getElementById('modal-snooze-btn').addEventListener('click', () => {
+        closeReminderModal();
+        resetTimer(5 * 60);
+        startTimer();
+        showToast('Snoozed for 5 minutes', '⏰');
+      });
+
+      document.getElementById('modal-dismiss-btn').addEventListener('click', () => {
+        closeReminderModal();
+      });
+
+      // Goal Edit Modal
+      const goalModal = document.getElementById('goal-modal');
+      const goalBox = document.getElementById('goal-modal-box');
+      const openGoalBtn = document.getElementById('edit-goal-trigger');
+      const cancelGoalBtn = document.getElementById('cancel-goal-btn');
+      const saveGoalBtn = document.getElementById('save-goal-btn');
+      const goalInput = document.getElementById('input-goal-value');
+
+      function openGoalDialog() {
+        goalInput.value = STATE.goal;
+        goalModal.classList.remove('opacity-0', 'pointer-events-none');
+        goalBox.classList.remove('scale-95');
+        goalBox.classList.add('scale-100');
+      }
+
+      function closeGoalDialog() {
+        goalModal.classList.add('opacity-0', 'pointer-events-none');
+        goalBox.classList.remove('scale-100');
+        goalBox.classList.add('scale-95');
+      }
+
+      openGoalBtn.addEventListener('click', openGoalDialog);
+      document.getElementById('info-btn').addEventListener('click', openGoalDialog);
+      cancelGoalBtn.addEventListener('click', closeGoalDialog);
+
+      saveGoalBtn.addEventListener('click', () => {
+        const val = parseInt(goalInput.value, 10);
+        if (val && val >= 500 && val <= 8000) {
+          STATE.goal = val;
+          renderIntakeProgress();
+          closeGoalDialog();
+          showToast(`Daily goal updated to ${val} ml`, '🎯');
+        } else {
+          showToast('Please enter a goal between 500 and 8000 ml', '⚠️');
+        }
+      });
+
+      // Request browser notification permission politely
+      if ("Notification" in window && Notification.permission === "default") {
+        setTimeout(() => {
+          Notification.requestPermission();
+        }, 3000);
+      }
+    });
+  </script>
+</body>
+</html>
+
+```
